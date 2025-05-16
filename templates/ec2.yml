@@ -1,27 +1,63 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Grupo de seguridad compartido para acceso HTTP
+Description: Instancias EC2 estáticas en dos AZ con UserData
+
+Parameters:
+  MinticAmiId:
+    Description: AMI para las instancias EC2
+    Type: String
+    Default: ami-0f88e80871fd81e91
 
 Resources:
 
-  # Grupo de seguridad que permite tráfico HTTP desde cualquier lugar
-  MinticSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
+  # Instancia EC2 estática en AZ1 con UserData
+  MinticEC2AZ1:
+    Type: AWS::EC2::Instance
     Properties:
-      GroupDescription: Acceso HTTP desde cualquier lugar
-      VpcId:
-        Fn::ImportValue: Mintic-VPCId
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: MinticSecurityGroup
+      ImageId: !Ref MinticAmiId
+      InstanceType: t2.micro
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          SubnetId:
+            Fn::ImportValue: Mintic-SubnetPublic1
+          DeviceIndex: 0
+          GroupSet:
+            - Fn::ImportValue: Mintic-SecurityGroupId
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "<html><body><h1>Hola desde EC2 AZ1 - IP: $(hostname -f)</h1></body></html>" > /var/www/html/index.html
+
+  # Instancia EC2 estática en AZ2 con UserData
+  MinticEC2AZ2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref MinticAmiId
+      InstanceType: t2.micro
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          SubnetId:
+            Fn::ImportValue: Mintic-SubnetPublic2
+          DeviceIndex: 0
+          GroupSet:
+            - Fn::ImportValue: Mintic-SecurityGroupId
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "<html><body><h1>Hola desde EC2 AZ2 - IP: $(hostname -f)</h1></body></html>" > /var/www/html/index.html
 
 Outputs:
-  # Exporta el SecurityGroupId como Mintic-SecurityGroupId para que lo usen EC2, ASG y ALB.
-  SecurityGroupId:
-    Value: !Ref MinticSecurityGroup
-    Export:
-      Name: Mintic-SecurityGroupId
+  MinticEC2AZ1PublicIP:
+    Description: IP pública de la instancia EC2 en AZ1
+    Value: !GetAtt MinticEC2AZ1.PublicIp
+
+  MinticEC2AZ2PublicIP:
+    Description: IP pública de la instancia EC2 en AZ2
+    Value: !GetAtt MinticEC2AZ2.PublicIp
