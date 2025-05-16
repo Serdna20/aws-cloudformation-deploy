@@ -2,7 +2,7 @@ name: MinTic Deploy to AWS CloudFormation
 
 on:
   push:
-    branches: [main]
+    branches: [feature/AFGS]
   workflow_dispatch:
 
 jobs:
